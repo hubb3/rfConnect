@@ -71,8 +71,7 @@ class RFStorage:
             self._data["devices"].pop(entry_id)
             await self.async_save()
 
-    @callback
-    def handle_rf_received(
+    async def handle_rf_received(
         self, hass: HomeAssistant, entry: ConfigEntry, event_data: dict[str, Any]
     ) -> None:
         """Handle received RF code and match it to devices.
