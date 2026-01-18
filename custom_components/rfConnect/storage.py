@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
@@ -23,6 +24,9 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Debounce time in seconds - prevents duplicate events
+DEBOUNCE_TIME = 1.0
+
 
 class RFStorage:
     """Handle RF Connect storage."""
@@ -32,6 +36,7 @@ class RFStorage:
         self.hass = hass
         self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         self._data: dict[str, Any] = {}
+        self._last_event_time: dict[str, float] = {}
 
     async def async_load(self) -> None:
         """Load data from storage."""
@@ -115,6 +120,23 @@ class RFStorage:
                 stored_device_int == received_device_int
                 and stored_channel == received_channel
             ):
+                # Check for duplicate event within debounce period
+                event_key = f"{received_device_int}_{received_channel}_{received_state}"
+                current_time = time.time()
+                last_time = self._last_event_time.get(event_key, 0)
+                
+                if current_time - last_time < DEBOUNCE_TIME:
+                    _LOGGER.debug(
+                        "Skipping duplicate RF event %s (%.2fs since last event, debounce: %.1fs)",
+                        event_key,
+                        current_time - last_time,
+                        DEBOUNCE_TIME
+                    )
+                    return
+                
+                # Update last event time
+                self._last_event_time[event_key] = current_time
+                
                 # Determine the actual state (on=1, off=0)
                 is_on_code = (received_state == STATE_ON)
                 is_off_code = (received_state == STATE_OFF)
