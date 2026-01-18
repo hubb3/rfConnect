@@ -68,10 +68,15 @@ class RFStorage:
             self._data["devices"].pop(entry_id)
             await self.async_save()
 
-    async def handle_rf_received(
+    @callback
+    def handle_rf_received(
         self, hass: HomeAssistant, entry: ConfigEntry, event_data: dict[str, Any]
     ) -> None:
-        """Handle received RF code and match it to devices."""
+        """Handle received RF code and match it to devices.
+        
+        Uses @callback decorator to ensure atomic execution in the event loop,
+        preventing race conditions in debounce logic.
+        """
         # ESPHome sends 'device' not 'device_id'
         received_device_id = event_data.get("device") or event_data.get(RF_DEVICE_ID)
         received_channel = event_data.get(RF_CHANNEL)
