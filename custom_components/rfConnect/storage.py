@@ -27,6 +27,9 @@ _LOGGER = logging.getLogger(__name__)
 # Debounce time in seconds - prevents duplicate events
 DEBOUNCE_TIME = 1.0
 
+# Cleanup threshold - remove entries older than this (in seconds)
+CLEANUP_THRESHOLD = 60.0
+
 
 class RFStorage:
     """Handle RF Connect storage."""
@@ -141,6 +144,18 @@ class RFStorage:
                 
                 # Update last event time
                 self._last_event_time[event_key] = current_time
+                
+                # Cleanup old entries to prevent unbounded memory growth
+                # Remove entries older than CLEANUP_THRESHOLD
+                keys_to_remove = [
+                    key for key, timestamp in self._last_event_time.items()
+                    if current_time - timestamp > CLEANUP_THRESHOLD
+                ]
+                for key in keys_to_remove:
+                    del self._last_event_time[key]
+                
+                if keys_to_remove:
+                    _LOGGER.debug("Cleaned up %d old debounce entries", len(keys_to_remove))
                 
                 # Determine the actual state (on=1, off=0)
                 is_on_code = (received_state == STATE_ON)
