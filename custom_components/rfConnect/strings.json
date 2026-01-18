@@ -1,0 +1,89 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "RF Connect Setup",
+        "description": "Enter the ESPHome entity ID that handles RF codes",
+        "data": {
+          "esphome_entity": "ESPHome Entity ID"
+        }
+      },
+      "device_setup": {
+        "title": "Device Configuration",
+        "description": "Configure the RF device",
+        "data": {
+          "device_name": "Device Name",
+          "device_type": "Device Type"
+        }
+      },
+      "learn_codes": {
+        "title": "Learn RF Codes",
+        "description": "Listening for RF remote button presses...\n\nCodes learned: {code_count}{code_list}\n\nPress Submit to update the list, or check 'Done' when finished.",
+        "data": {
+          "manual_input": "Manual input",
+          "done": "Done (finish setup)"
+        }
+      },
+      "manual_input": {
+        "title": "Manual RF Code Entry",
+        "description": "Enter the RF code manually for '{device_name}'",
+        "data": {
+          "device_id": "Device ID (hex, e.g., 0xB692BE)",
+          "channel": "Channel",
+          "state_type": "State Type"
+        }
+      }
+    },
+    "error": {
+      "invalid_rf_code": "Invalid RF code format"
+    },
+    "abort": {
+      "already_configured": "Device is already configured",
+      "no_codes": "No RF codes to remove",
+      "not_confirmed": "Deletion not confirmed"
+    }
+  },
+  "options": {
+    "step": {
+      "menu": {
+        "title": "RF Device Options",
+        "menu_options": {
+          "add_rf_code": "Add RF Code",
+          "remove_rf_code": "Remove RF Code",
+          "delete_device": "Delete Device"
+        }
+      },
+      "add_rf_code": {
+        "title": "Add RF Code",
+        "description": "Add a new RF code to this device. Check 'Learn from remote' to automatically capture the code, or enter it manually.",
+        "data": {
+          "learn_from_remote": "Learn from remote (automatic)",
+          "device_id": "Device ID (hex) - manual entry",
+          "channel": "Channel - manual entry",
+          "state_type": "State Type - manual entry"
+        }
+      },
+      "listen_rf_options": {
+        "title": "Listening for RF Code",
+        "description": "Press the ON button on your RF remote now.\n\nThe code will be captured automatically and added to '{device_name}'. If nothing happens, check 'Manual entry' below.",
+        "data": {
+          "manual_entry": "Manual entry (if automatic learning fails)"
+        }
+      },
+      "remove_rf_code": {
+        "title": "Remove RF Code",
+        "description": "Select the RF code to remove",
+        "data": {
+          "code_index": "RF Code"
+        }
+      },
+      "delete_device": {
+        "title": "Delete Device",
+        "description": "Are you sure you want to delete '{device_name}'? This will remove all associated entities.",
+        "data": {
+          "confirm": "Confirm deletion"
+        }
+      }
+    }
+  }
+}
