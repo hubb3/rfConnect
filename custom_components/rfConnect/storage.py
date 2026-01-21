@@ -24,11 +24,8 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# Debounce time in seconds - prevents duplicate events
-DEBOUNCE_TIME = 1.0
-
-# Cleanup threshold - remove entries older than this (in seconds)
-CLEANUP_THRESHOLD = 60.0
+# Global receive debounce - prevents processing repeated RF transmissions from switches
+RECEIVE_DEBOUNCE_TIME = 0.5
 
 
 class RFStorage:
@@ -39,7 +36,7 @@ class RFStorage:
         self.hass = hass
         self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         self._data: dict[str, Any] = {}
-        self._last_event_time: dict[str, float] = {}
+        self._last_receive_time: float = 0.0  # Global receive debounce
 
     async def async_load(self) -> None:
         """Load data from storage."""
@@ -76,8 +73,11 @@ class RFStorage:
     ) -> None:
         """Handle received RF code and match it to devices.
         
-        Uses @callback decorator to ensure atomic execution in the event loop,
-        preventing race conditions in debounce logic.
+        Runs synchronously in Home Assistant's single-threaded event loop,
+        ensuring the debounce check and update happen atomically.
+        
+        Implements global receive debounce to filter out repeated RF transmissions
+        from switches, preventing duplicate events in Home Assistant.
         """
         # ESPHome sends 'device' not 'device_id'
         received_device_id = event_data.get("device") or event_data.get(RF_DEVICE_ID)
@@ -95,6 +95,18 @@ class RFStorage:
         except (ValueError, TypeError):
             _LOGGER.warning("Invalid channel or state format: %s", event_data)
             return
+        
+        # Global receive debounce - ignore repeated transmissions from RF switches
+        current_time = time.time()
+        if current_time - self._last_receive_time < RECEIVE_DEBOUNCE_TIME:
+            _LOGGER.debug(
+                "Skipping RF code due to debounce (%.3fs since last receive)",
+                current_time - self._last_receive_time
+            )
+            return
+        
+        # Update global receive time for valid codes only
+        self._last_receive_time = current_time
 
         _LOGGER.debug("RF code received: device=%s, channel=%s, state=%s", 
                      received_device_id, received_channel, received_state)
@@ -127,35 +139,6 @@ class RFStorage:
                 stored_device_int == received_device_int
                 and stored_channel == received_channel
             ):
-                # Check for duplicate event within debounce period
-                event_key = f"{received_device_int}_{received_channel}_{received_state}"
-                current_time = time.time()
-                last_time = self._last_event_time.get(event_key, 0)
-                
-                if current_time - last_time < DEBOUNCE_TIME:
-                    _LOGGER.debug(
-                        "Skipping duplicate RF event %s (%.2fs since last event, debounce: %.1fs)",
-                        event_key,
-                        current_time - last_time,
-                        DEBOUNCE_TIME
-                    )
-                    return
-                
-                # Update last event time
-                self._last_event_time[event_key] = current_time
-                
-                # Cleanup old entries to prevent unbounded memory growth
-                # Remove entries older than CLEANUP_THRESHOLD
-                keys_to_remove = [
-                    key for key, timestamp in self._last_event_time.items()
-                    if current_time - timestamp > CLEANUP_THRESHOLD
-                ]
-                for key in keys_to_remove:
-                    del self._last_event_time[key]
-                
-                if keys_to_remove:
-                    _LOGGER.debug("Cleaned up %d old debounce entries", len(keys_to_remove))
-                
                 # Determine the actual state (on=1, off=0)
                 is_on_code = (received_state == STATE_ON)
                 is_off_code = (received_state == STATE_OFF)
