@@ -24,8 +24,9 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# Debounce time in seconds - prevents duplicate events
-DEBOUNCE_TIME = 1.0
+# Global receive debounce time in seconds - prevents processing multiple RF codes simultaneously
+# This prevents issues when the system can't reliably handle 2 codes at the same time
+RECEIVE_DEBOUNCE_TIME = 0.5
 
 # Cleanup threshold - remove entries older than this (in seconds)
 CLEANUP_THRESHOLD = 60.0
@@ -39,7 +40,7 @@ class RFStorage:
         self.hass = hass
         self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         self._data: dict[str, Any] = {}
-        self._last_event_time: dict[str, float] = {}
+        self._last_receive_time: float = 0.0  # Global receive debounce
 
     async def async_load(self) -> None:
         """Load data from storage."""
@@ -79,7 +80,24 @@ class RFStorage:
         
         Uses @callback decorator to ensure atomic execution in the event loop,
         preventing race conditions in debounce logic.
+        
+        Implements global receive debounce to prevent processing multiple RF codes
+        simultaneously, as the system cannot reliably handle 2 codes at once.
         """
+        # Global receive debounce - reject ANY RF code if one was just processed
+        current_time = time.time()
+        if current_time - self._last_receive_time < RECEIVE_DEBOUNCE_TIME:
+            time_since_last = current_time - self._last_receive_time
+            _LOGGER.debug(
+                "Skipping RF code due to global receive debounce (%.3fs since last receive, debounce: %.1fs)",
+                time_since_last,
+                RECEIVE_DEBOUNCE_TIME
+            )
+            return
+        
+        # Update global receive time
+        self._last_receive_time = current_time
+        
         # ESPHome sends 'device' not 'device_id'
         received_device_id = event_data.get("device") or event_data.get(RF_DEVICE_ID)
         received_channel = event_data.get(RF_CHANNEL)
@@ -128,35 +146,6 @@ class RFStorage:
                 stored_device_int == received_device_int
                 and stored_channel == received_channel
             ):
-                # Check for duplicate event within debounce period
-                event_key = f"{received_device_int}_{received_channel}_{received_state}"
-                current_time = time.time()
-                last_time = self._last_event_time.get(event_key, 0)
-                
-                if current_time - last_time < DEBOUNCE_TIME:
-                    _LOGGER.debug(
-                        "Skipping duplicate RF event %s (%.2fs since last event, debounce: %.1fs)",
-                        event_key,
-                        current_time - last_time,
-                        DEBOUNCE_TIME
-                    )
-                    return
-                
-                # Update last event time
-                self._last_event_time[event_key] = current_time
-                
-                # Cleanup old entries to prevent unbounded memory growth
-                # Remove entries older than CLEANUP_THRESHOLD
-                keys_to_remove = [
-                    key for key, timestamp in self._last_event_time.items()
-                    if current_time - timestamp > CLEANUP_THRESHOLD
-                ]
-                for key in keys_to_remove:
-                    del self._last_event_time[key]
-                
-                if keys_to_remove:
-                    _LOGGER.debug("Cleaned up %d old debounce entries", len(keys_to_remove))
-                
                 # Determine the actual state (on=1, off=0)
                 is_on_code = (received_state == STATE_ON)
                 is_off_code = (received_state == STATE_OFF)
