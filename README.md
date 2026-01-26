@@ -322,7 +322,7 @@ script:
 ## Support
 
 For issues, feature requests, or questions:
-- GitHub Issues: [Create an issue](https://github.com/yourusername/rfconnect/issues)
+- GitHub Issues: [Create an issue](https://github.com/hubb3/rfconnect/issues)
 - Home Assistant Community: [Forum thread](https://community.home-assistant.io/)
 
 ## Credits
